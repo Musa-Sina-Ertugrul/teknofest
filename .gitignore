@@ -162,3 +162,7 @@ cython_debug/
 #.idea/
 
 train-v2.0.json
+log
+my_model
+output
+tensorboard

@@ -5,8 +5,6 @@ from kan import KANLinear
 from transformers import PreTrainedModel, GenerationMixin
 from transformers.modeling_utils import PushToHubMixin
 
-
-gpt2_tokenizer = AutoTokenizer.from_pretrained("openai-community/gpt2")
 gpt2_model = AutoModelForCausalLM.from_pretrained("openai-community/gpt2")
 
 
@@ -19,26 +17,28 @@ class PreProcess(torch.nn.Module):
     def cos_sims2eigen_vals(self, vec2vec_matricies: torch.Tensor):
         batch_num = vec2vec_matricies.shape[0]
         row_num = vec2vec_matricies.shape[1]
-        col_num = vec2vec_matricies.shape[2]
         cos_similarities = torch.stack(
             [
-                torch.cosine_similarity(vec, matrix[0],dim=0)
+                torch.cosine_similarity(vec, matrix[0], dim=0)
                 for matrix in torch.unbind(vec2vec_matricies, dim=0)
                 for vec in torch.unbind(matrix, dim=0)
             ],
             dim=0,
         ).view(batch_num, row_num)
         symmetric_matricies = torch.zeros(
-            size=(batch_num, row_num, col_num), device="cuda"
+            size=(batch_num, row_num, row_num), device="cuda"
         )
-        for index_start in torch.arange(start=0, end=col_num, device="cuda"):
-            symmetric_matricies[
+        for index_start in torch.arange(start=0, end=row_num, device="cuda"):
+            batch_indices, row_indices, col_indices = torch.meshgrid(
                 torch.arange(start=0, end=batch_num, device="cuda"),
                 torch.arange(start=0, end=row_num, device="cuda"),
-                torch.arange(start=index_start, end=col_num, device="cuda"),
-            ] = cos_similarities[
-                torch.arange(start=0, end=batch_num, device="cuda"), index_start:
-            ]
+                torch.arange(start=index_start, end=row_num, device="cuda"),
+                indexing="ij",
+            )
+
+            symmetric_matricies[batch_indices, row_indices, col_indices] = (
+                cos_similarities[batch_indices, col_indices]
+            )
         eigen_vals = torch.stack(
             [
                 torch.linalg.eigvalsh(matrix, UPLO="U")
@@ -83,6 +83,7 @@ class PreProcess(torch.nn.Module):
         unit_vecs = self.unit_vecs(input)
         vec2vec_matricies = self.vec2vec_matricies(unit_vecs)
         eigen_vals = self.cos_sims2eigen_vals(vec2vec_matricies)
+        eigen_vals = eigen_vals.mul(50_256).long()
         return eigen_vals
 
 
@@ -168,11 +169,9 @@ class Model(PreTrainedModel):
         super().__init__(*args, **kwargs)
 
         self.gpt2 = gpt2_model  # 768x50257 output
-        self.tokenizer = gpt2_tokenizer
-        self.tokenizer.pad_token = self.tokenizer.eos_token
         self.preprocess = PreProcess()
         self.mfp = MFP()
-        self.gpt2.lm_head = torch.nn.Flatten()
+        self.gpt2.lm_head = torch.nn.Linear(768,768)
         self.preprocess.requires_grad_(False)
 
     def forward(self, input: torch.Tensor):
