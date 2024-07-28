@@ -168,3 +168,4 @@ output
 tensorboard
 datasets/
 bows/
+model.pth

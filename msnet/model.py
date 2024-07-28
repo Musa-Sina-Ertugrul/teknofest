@@ -122,24 +122,26 @@ class MFP(torch.nn.Module):
         self.gelu = torch.nn.GELU()
         self.softplus = torch.nn.Softplus()
         # -----------------------------------------------
-        self.leaky_relu_linear = torch.nn.Linear(256, 64)
-        self.tanh_linear = torch.nn.Linear(256,64)
-        self.sigmoid_linear = torch.nn.Linear(256, 64)
-        self.softplus_linear = torch.nn.Linear(256,64)
-        self.mish_linear = torch.nn.Linear(256, 64)
-        self.selu_linear = torch.nn.Linear(256,64)
-        self.elu_linear = torch.nn.Linear(256, 64)
-        self.gelu_linear = torch.nn.Linear(256,64)
-        self.kan = KAN([512,256,5],spline_order=6,grid_size=10)
+        self.leaky_relu_linear = torch.nn.Linear(1024, 1024)
+        self.tanh_linear = torch.nn.Linear(1024,1024)
+        self.sigmoid_linear = torch.nn.Linear(1024, 1024)
+        self.softplus_linear = torch.nn.Linear(1024,1024)
+        self.mish_linear = torch.nn.Linear(1024, 1024)
+        self.selu_linear = torch.nn.Linear(1024,1024)
+        self.elu_linear = torch.nn.Linear(1024, 1024)
+        self.gelu_linear = torch.nn.Linear(1024,1024)
+        self.kan = KAN([512,1024,512],spline_order=6,grid_size=10)
         # -----------------------------------------------
-        self.linear_1 = torch.nn.Linear(8*64,8*64)
-        self.linear_2 = torch.nn.Linear(8*64,10)
+        self.linear_1 = torch.nn.Linear(8*1024,8*1024)
+        self.linear_2 = torch.nn.Linear(8*1024,512)
+        self.linear_final_1 = torch.nn.Linear(512,1024)
+        self.linear_final_2 = torch.nn.Linear(1024,4)
         # -----------------------------------------------
-        self.layer_norm_start = torch.nn.LayerNorm(256)
-        self.layer_norm_final = torch.nn.LayerNorm(8*64)
+        self.layer_norm_start = torch.nn.LayerNorm(1024,eps=1e-8)
+        self.layer_norm_final = torch.nn.LayerNorm(8*1024,eps=1e-8)
         self.drop_out = torch.nn.Dropout1d(p=0.1)
         # -----------------------------------------------
-        self.softmax = torch.nn.Softmax(dim=1)
+        self.softmax = torch.nn.Softmax(dim=2)
 
     def forward(self, x):
         x = self.layer_norm_start(x)
@@ -169,12 +171,19 @@ class MFP(torch.nn.Module):
         x_gelu = self.gelu_linear(x)
         x_gelu = self.gelu(x_gelu)
         # ------------------------------------------
-        x_final = torch.cat((x_mish,x_tanh,x_sigmoid,x_softplus,x_mish,x_selu,x_elu,x_gelu),dim=1)
+        x_final = torch.cat((x_mish,x_tanh,x_sigmoid,x_softplus,x_mish,x_selu,x_elu,x_gelu),dim=2)
         # ------------------------------------------
         x_final = self.layer_norm_final(x_final)
         x_final = self.drop_out(x_final)
-
+        x_final = self.linear_1(x_final)
+        x_final = self.elu(x_final)
+        x_final = self.linear_2(x_final)
+        x_final = self.elu(x_final)
         x_final = self.kan(x_final)
+        x_final = self.linear_final_1(x_final)
+        x_final = self.gelu(x_final)
+        x_final = self.linear_final_2(x_final)
+        x_final = self.gelu(x_final)
         #x_final = self.softmax(x_final)
         return x_final
 
@@ -184,21 +193,20 @@ class CollecterModel(torch.nn.Module):
         super().__init__(*args, **kwargs)
 
         self.leaky_relu = torch.nn.LeakyReLU()
-        self.gelu = torch.nn.GELU()
+        self.elu = torch.nn.ELU()
         self.drop_out = torch.nn.Dropout(p=0.1)
-        self.embedding_1 = torch.nn.Embedding(50257,256)
+        #self.embedding_1 = torch.nn.Embedding(50257,1024)
         self.flatten = torch.nn.Flatten()
-        self.linear_1 = torch.nn.Linear(1280,1280)
-        self.linear_2 = torch.nn.Linear(1280,256)
+        self.linear_1 = torch.nn.Linear(768,2048)
+        self.linear_2 = torch.nn.Linear(2048,1024)
 
     def forward(self,x):
 
-        output = self.flatten(self.embedding_1(x))
-        output = self.gelu(output)
+        output = self.drop_out(x)
         output = self.linear_1(output)
-        output = self.gelu(output)
+        output = self.elu(output)
         output = self.linear_2(output)
-        output = self.gelu(output)
+        output = self.elu(output)
 
         return output
 
@@ -209,13 +217,12 @@ class Model(torch.nn.Module):
         self.mfp = MFP()
         self.model = AutoModelForCausalLM.from_pretrained("ytu-ce-cosmos/turkish-gpt2")
         self.model.requires_grad_(False)
-        self.collecter = CollecterModel()
-
+        self.model.lm_head = CollecterModel()
+        self.model.lm_head.requires_grad_(True)
 
     def forward(self,input_ids: torch.Tensor):
         input_ids = input_ids.to("cuda").long()
-        output = self.model(input_ids).logits.argmax(dim=2)
-        output = self.collecter(output)
+        output = self.model(input_ids).logits
         output = self.mfp(output)
         return output
 

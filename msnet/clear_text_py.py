@@ -7,8 +7,8 @@ from tqdm.auto import tqdm
 
 
 def func(queue: Queue, df: pd.DataFrame):
-    def join_str(review):
-        return " ".join(review)
+    def join_str(text):
+        return " ".join(text)
 
     import logging
 
@@ -27,9 +27,9 @@ def func(queue: Queue, df: pd.DataFrame):
     spell_checker = TurkishSpellChecker(morphology)
 
     # %%
-    def correct_spells(review: str):
+    def correct_spells(text: str):
 
-        words = review.split(" ")
+        words = text.split(" ")
         for i, word in enumerate(words):
             try:
                 words[i] = spell_checker.suggest_for_word(word)[0]
@@ -38,17 +38,17 @@ def func(queue: Queue, df: pd.DataFrame):
         return " ".join(words)
 
     # %%
-    df["review"] = df["review"].map(correct_spells)
+    df["text"] = df["text"].map(correct_spells)
 
     # %%
-    def extract_sentence(review):
-        return extractor.from_paragraph(review)
+    def extract_sentence(text):
+        return extractor.from_paragraph(text)
 
     # %%
-    df["review"] = df["review"].map(extract_sentence)
+    df["text"] = df["text"].map(extract_sentence)
 
     # %%
-    df = df[df["review"] != ""]
+    df = df[df["text"] != ""]
 
     # %%
     def normalize_long_text(paragraph: str) -> str:
@@ -61,7 +61,7 @@ def func(queue: Queue, df: pd.DataFrame):
         return " ".join(result)
 
     # %%
-    df["review"] = df["review"].map(normalize_long_text)
+    df["text"] = df["text"].map(normalize_long_text)
 
     # %% [markdown]
     # ### Stopwords
@@ -80,37 +80,37 @@ def func(queue: Queue, df: pd.DataFrame):
         return [word for word in sentence.split(" ") if word not in stops]
 
     # %%
-    df["review"] = df["review"].map(clear_stop_words)
+    df["text"] = df["text"].map(clear_stop_words)
 
     # %% [markdown]
     # ### Lemmatization
 
     # %%
-    df["review"] = df["review"].map(join_str)
+    df["text"] = df["text"].map(join_str)
 
     # %%
-    def remove_upper_punctuation(review):
-        return review.replace('"', "").replace("’", "").replace("'", "").replace("”", "")
+    def remove_upper_punctuation(text):
+        return text.replace('"', "").replace("’", "").replace("'", "").replace("”", "")
 
     # %%
-    df["review"] = df["review"].map(remove_upper_punctuation)
+    df["text"] = df["text"].map(remove_upper_punctuation)
 
     # %%
-    def sep_text(review):
-        return review.split(" ")
+    def sep_text(text):
+        return text.split(" ")
 
     # %%
 
-    df["review"] = df["review"].map(sep_text)
+    df["text"] = df["text"].map(sep_text)
 
     # %%
     import zeyrek
 
     analyzer = zeyrek.MorphAnalyzer()
 
-    def lemmatize_sent(review):
+    def lemmatize_sent(text):
         result = []
-        for word in review:
+        for word in text:
             try:
                 result.append(analyzer.lemmatize(word)[0][1][0])
             except BaseException:
@@ -118,22 +118,22 @@ def func(queue: Queue, df: pd.DataFrame):
         return " ".join(result)
 
     # %%
-    df["review"] = df["review"].map(lemmatize_sent)
+    df["text"] = df["text"].map(lemmatize_sent)
 
     # %%
-    df["review"] = df["review"].map(lambda x: x.casefold())
+    df["text"] = df["text"].map(lambda x: x.casefold())
     """
     import unidecode
 
     turkish_chars = "ÇçĞğıİÖöŞşÜü"
     normal_chars = unidecode.unidecode(turkish_chars)
 
-    def change_turkish_chars(review:str):
+    def change_turkish_chars(text:str):
         for char,turkish_char in zip(normal_chars,turkish_chars):
-            review = review.replace(turkish_char,char)
-        return review
+            text = text.replace(turkish_char,char)
+        return text
     
-    df["review"] = df["review"].map(change_turkish_chars)
+    df["text"] = df["text"].map(change_turkish_chars)
     """
     queue.put(df)
     print("done")
@@ -146,12 +146,14 @@ if __name__ == "__main__":
         "/home/musasina/projects/teknofest/msnet/datasets/train_final.csv"
     )
     df_train.head()
+    splits = {'train': 'train.csv', 'test': 'test.csv'}
+    df_train = pd.read_csv("hf://datasets/winvoker/turkish-sentiment-analysis-dataset/" + splits["train"])
 
     # %%
     df_train = df_train.convert_dtypes(convert_string=True)
 
     # %%
-    df_train = df_train[df_train["review"] != ""]
+    df_train = df_train[df_train["text"] != ""]
     """
     # %%
     print(len(df_train[df_train["label"] == "Notr"]))
@@ -180,7 +182,7 @@ if __name__ == "__main__":
     #df_test = df_test.convert_dtypes(convert_string=True)
 
     # %% [markdown]
-    # # review Preprocessing
+    # # text Preprocessing
 
     # %%
     import re
@@ -189,46 +191,46 @@ if __name__ == "__main__":
     # ### Convert to lower case
 
     # %%
-    df_train["review"] = [token.casefold() for token in df_train["review"]]
+    df_train["text"] = [token.casefold() for token in df_train["text"]]
     df_train.head(5)
 
     # %% [markdown]
     # ### Remove @ mentions and hyperlinks
 
     # %%
-    found = df_train[df_train["review"].str.contains("@")]
+    found = df_train[df_train["text"].str.contains("@")]
     found.count()
 
     # %%
     df_train.info()
 
     # %%
-    df_train["review"] = (
-        df_train["review"]
+    df_train["text"] = (
+        df_train["text"]
         .replace("@[A-Za-z0-9]+", "", regex=True)
         .replace("@[A-Za-z0-9]+", "", regex=True)
     )
-    found = df_train[df_train["review"].str.contains("@")]
+    found = df_train[df_train["text"].str.contains("@")]
     found.count()
 
     # %%
-    found = df_train[df_train["review"].str.contains("http")]
+    found = df_train[df_train["text"].str.contains("http")]
     found.count()
 
     # %%
-    df_train["review"] = (
-        df_train["review"]
+    df_train["text"] = (
+        df_train["text"]
         .replace(r"http\S+", "", regex=True)
         .replace(r"www\S+", "", regex=True)
     )
-    found = df_train[df_train["review"].str.contains("http")]
+    found = df_train[df_train["text"].str.contains("http")]
     found.count()
 
     # %% [markdown]
     # ### Remove Punctations & Emojies & Numbers
 
     # %%
-    sentences = df_train["review"].copy()
+    sentences = df_train["text"].copy()
     new_sent = []
     i = 0
     for sentence in sentences:
@@ -236,22 +238,22 @@ if __name__ == "__main__":
         new_sent.append(new_sentence)
         i += 1
 
-    df_train["review"] = new_sent
-    df_train["review"].head(5)
+    df_train["text"] = new_sent
+    df_train["text"].head(5)
 
     # %%
 
 
     # %%
-    df_train["review"] = new_sent
-    df_train["review"].head(5)
+    df_train["text"] = new_sent
+    df_train["text"].head(5)
 
     # %%
-    def join_str(review):
-        return " ".join(review)
+    def join_str(text):
+        return " ".join(text)
 
     # %%
-    df_train["review"] = df_train["review"].map(join_str)
+    df_train["text"] = df_train["text"].map(join_str)
 
     # %%
     df_train = df_train.convert_dtypes(convert_string=True)
@@ -267,21 +269,21 @@ if __name__ == "__main__":
 
     # %%
     # %%
-    df_train_1 = df_train.iloc[:10000, :].copy()
-    df_train_2 = df_train.iloc[10000:20000, :].copy()
-    df_train_3 = df_train.iloc[20000:30000, :].copy()
-    df_train_4 = df_train.iloc[30000:40000, :].copy()
-    df_train_5 = df_train.iloc[40000:50000, :].copy()
-    df_train_6 = df_train.iloc[50000:60000, :].copy()
-    df_train_7 = df_train.iloc[60000:70000, :].copy()
-    df_train_8 = df_train.iloc[70000:80000, :].copy()
-    df_train_9 = df_train.iloc[80000:90000, :].copy()
-    df_train_10 = df_train.iloc[90000:100000, :].copy()
-    df_train_11 = df_train.iloc[100000:110000, :].copy()
-    df_train_12 = df_train.iloc[110000:120000, :].copy()
-    df_train_13 = df_train.iloc[120000:130000, :].copy()
-    df_train_14 = df_train.iloc[130000:140000, :].copy()
-    df_train_15 = df_train.iloc[150000:, :].copy()
+    df_train_1 = df_train.iloc[:30_000, :].copy()
+    df_train_2 = df_train.iloc[30_000:60_000, :].copy()
+    df_train_3 = df_train.iloc[60_000:90_000, :].copy()
+    df_train_4 = df_train.iloc[90_000:120_000, :].copy()
+    df_train_5 = df_train.iloc[120_000:150_000, :].copy()
+    df_train_6 = df_train.iloc[150_000:180_000, :].copy()
+    df_train_7 = df_train.iloc[180_000:210_000, :].copy()
+    df_train_8 = df_train.iloc[210_000:240_000, :].copy()
+    df_train_9 = df_train.iloc[240_000:270_000, :].copy()
+    df_train_10 = df_train.iloc[270_000:300_000, :].copy()
+    df_train_11 = df_train.iloc[300_000:330_000, :].copy()
+    df_train_12 = df_train.iloc[330_000:360_000, :].copy()
+    df_train_13 = df_train.iloc[360_000:390_000, :].copy()
+    df_train_14 = df_train.iloc[390_000:420_000, :].copy()
+    df_train_15 = df_train.iloc[420_000:, :].copy()
     dfs = [
         df_train_1,
         df_train_2,
@@ -318,12 +320,12 @@ if __name__ == "__main__":
 
     df_train = pd.concat(dfs, ignore_index=True)
 
-    freq = pd.Series((' '.join(df_train['review'])).split()).value_counts()
+    freq = pd.Series((' '.join(df_train['text'])).split()).value_counts()
     less_freq = set(freq[freq == 1])
-    df_train["review"] = df_train["review"].map(lambda x: " ".join(x for x in x.split() if x not in less_freq))
+    df_train["text"] = df_train["text"].map(lambda x: " ".join(x for x in x.split() if x not in less_freq))
 
     # %%
     df_train.to_csv(
-        "/home/musasina/projects/teknofest/msnet/datasets/train_final_turkish.csv", index=False
+        "/home/musasina/projects/teknofest/msnet/datasets/train_turkish_all.csv", index=False
     )
     # df_test.to_csv("/home/musasina/projects/teknofest/gpt2/datasets/test.csv",index=False)
