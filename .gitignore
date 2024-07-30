@@ -169,3 +169,4 @@ tensorboard
 datasets/
 bows/
 model.pth
+tokenize,ner/

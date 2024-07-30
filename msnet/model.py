@@ -1,6 +1,6 @@
 import torch.utils
 import torch
-from kan import KANLinear,KAN
+#from kan import KANLinear,KAN
 import torch.nn.functional as F
 from transformers import AutoModel,AutoModelForSequenceClassification,AutoModelForCausalLM
 
@@ -130,11 +130,11 @@ class MFP(torch.nn.Module):
         self.selu_linear = torch.nn.Linear(768,768)
         self.elu_linear = torch.nn.Linear(768, 768)
         self.gelu_linear = torch.nn.Linear(768,768)
-        self.kan = KAN([512,256,512],spline_order=4,grid_size=10)
+        self.kan = KAN([2*768,768,2*768],spline_order=6,grid_size=10)
         # -----------------------------------------------
-        self.linear_1 = torch.nn.Linear(8*768,8*768)
-        self.linear_2 = torch.nn.Linear(8*768,512)
-        self.linear_final_1 = torch.nn.Linear(512,4)
+        self.linear_1 = torch.nn.Linear(8*768,8*512)
+        self.linear_2 = torch.nn.Linear(8*512,2*768)
+        self.linear_final_1 = torch.nn.Linear(2*768,4)
         self.linear_final_2 = torch.nn.Linear(1024,4)
         # -----------------------------------------------
         self.layer_norm_start = torch.nn.LayerNorm(768,eps=1e-8)
@@ -212,7 +212,7 @@ class Model(torch.nn.Module):
         super().__init__(*args, **kwargs)
         self.mfp = MFP()
         self.model = AutoModelForCausalLM.from_pretrained("ytu-ce-cosmos/turkish-gpt2")
-        self.model.requires_grad_(True)
+        self.model.requires_grad_(False)
         self.model.lm_head = torch.nn.Flatten(start_dim=2)
         self.model.lm_head.requires_grad_(True)
 

@@ -13,3 +13,7 @@ unidecode
 pandarallel
 numba
 sklearn
+sentencepiece
+accelerate
+bitsandbytes
+stanza
