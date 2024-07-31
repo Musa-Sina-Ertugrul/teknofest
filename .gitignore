@@ -169,4 +169,5 @@ tensorboard
 datasets/
 bows/
 model.pth
+model_2.pth
 tokenize,ner/
