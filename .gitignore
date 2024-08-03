@@ -171,3 +171,6 @@ bows/
 model.pth
 model_2.pth
 tokenize,ner/
+model_0_3999.pth
+model_0_4999.pth
+model_0_5999.pth
