@@ -135,7 +135,8 @@ class MFP(torch.nn.Module):
         self.linear_1 = torch.nn.Linear(8*768,8*512)
         self.linear_2 = torch.nn.Linear(8*512,2*768)
         self.linear_start_1 = torch.nn.Linear(768,10)
-        self.linear_final_1 = torch.nn.Linear(2*768,3)
+        self.linear_final_1 = torch.nn.Linear(2*768,1280)
+        self.linear_final_2 = torch.nn.Linear(1280,3)
         # -----------------------------------------------
         self.layer_norm_start = torch.nn.LayerNorm(768,eps=1e-8)
         self.layer_norm_final = torch.nn.LayerNorm(8*768,eps=1e-8)
@@ -183,6 +184,8 @@ class MFP(torch.nn.Module):
         x_final = self.elu(x_final)
         x_final = self.kan(x_final)
         x_final = self.linear_final_1(x_final)
+        x_final = self.elu(x_final)
+        x_final = self.linear_final_2(x_final)
         x_final = self.gelu(x_final)
         x_final = self.softmax(x_final)
         return x_final
