@@ -174,3 +174,5 @@ tokenize,ner/
 model_0_3999.pth
 model_0_4999.pth
 model_0_5999.pth
+model_0_6999.pth
+model_2_128.pth
