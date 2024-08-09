@@ -7,105 +7,6 @@ from transformers import AutoModel,AutoModelForSequenceClassification,AutoModelF
 torch.manual_seed(42)
 torch.cuda.manual_seed(42)
 
-class CNNAvgMax(torch.nn.Module):
-
-    def __init__(self,input_channel,input_layer, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-        self.leaky_relu = torch.nn.LeakyReLU()
-        self.layer_norm_start = torch.nn.LayerNorm(input_layer)
-        self.layer_norm_final = torch.nn.LayerNorm(30)
-        self.avg_pool = torch.nn.AvgPool1d(2)
-        self.max_pool = torch.nn.MaxPool1d(2)
-        #-----------------------------------------
-        self.cnn_1 = torch.nn.Conv1d(input_channel,128,3)
-        self.cnn_2 = torch.nn.Conv1d(128,128,3)
-        self.cnn_3 = torch.nn.Conv1d(128,128,5,stride=2)
-        self.cnn_4 = torch.nn.Conv1d(128,128,5,stride=2)
-        self.cnn_5 = torch.nn.Conv1d(128,128,7,stride=3)
-        self.cnn_6 = torch.nn.Conv1d(128,128,7,stride=3)
-        self.cnn_7 = torch.nn.Conv1d(128,128,9,stride=4,padding=3)
-
-    def forward(self,x):
-
-        x = self.layer_norm_start(x)
-        x = self.cnn_1(x)
-        x = self.leaky_relu(x)
-        x = self.avg_pool(x)
-        x = self.cnn_2(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_3(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_4(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_5(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_6(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_7(x)
-        x = self.leaky_relu(x)
-        x = self.max_pool(x)
-        return x
-
-class CNNMaxAvg(torch.nn.Module):
-
-    def __init__(self,input_channel,input_layer, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-        self.leaky_relu = torch.nn.LeakyReLU()
-        self.layer_norm_start = torch.nn.LayerNorm(input_layer)
-        self.layer_norm_final = torch.nn.LayerNorm(30)
-        self.avg_pool = torch.nn.AvgPool1d(2)
-        self.max_pool = torch.nn.MaxPool1d(2)
-        #-----------------------------------------
-        self.cnn_1 = torch.nn.Conv1d(input_channel,128,3)
-        self.cnn_2 = torch.nn.Conv1d(128,128,3)
-        self.cnn_3 = torch.nn.Conv1d(128,128,5,stride=2)
-        self.cnn_4 = torch.nn.Conv1d(128,128,5,stride=2)
-        self.cnn_5 = torch.nn.Conv1d(128,128,7,stride=3)
-        self.cnn_6 = torch.nn.Conv1d(128,128,7,stride=3)
-        self.cnn_7 = torch.nn.Conv1d(128,128,9,stride=4,padding=3)
-
-    def forward(self,x):
-
-        x = self.layer_norm_start(x)
-        x = self.cnn_1(x)
-        x = self.leaky_relu(x)
-        x = self.max_pool(x)
-        x = self.cnn_2(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_3(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_4(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_5(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_6(x)
-        x = self.leaky_relu(x)
-        x = self.cnn_7(x)
-        x = self.leaky_relu(x)
-        x = self.avg_pool(x)
-        return x
-
-
-
-class PatternExtraction(torch.nn.Module):
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-        self.rnn = torch.nn.RNN(1024,256,num_layers=2,dropout=0.1)
-        self.lstm = torch.nn.LSTM(input_size=1024,hidden_size=256,dropout=0.1,num_layers=2)
-        self.gru = torch.nn.GRU(1024,hidden_size=256,num_layers=9,dropout=0.1)
-
-    def forward(self,x):
-        x_rnn,_ = self.rnn(x)
-        x_lstm,_ = self.lstm(x)
-        x_gru,_ = self.gru(x)
-        x_final = torch.cat((x_rnn,x_lstm,x_gru),dim=1)
-        x_final = x_final.view(x.shape[0],3,-1)
-        return x_final
-
 class MFP(torch.nn.Module):
 
     def __init__(self, *args, **kwargs) -> None:
@@ -190,27 +91,6 @@ class MFP(torch.nn.Module):
         x_final = self.softmax(x_final)
         return x_final
 
-class CollecterModel(torch.nn.Module):
-
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-
-        self.leaky_relu = torch.nn.LeakyReLU()
-        self.elu = torch.nn.ELU()
-        self.drop_out = torch.nn.Dropout(p=0.1)
-        #self.embedding_1 = torch.nn.Embedding(50257,1024)
-        self.flatten = torch.nn.Flatten()
-        self.linear_1 = torch.nn.Linear(768,1024)
-        self.linear_2 = torch.nn.Linear(2048,1024)
-
-    def forward(self,x):
-
-        output = self.drop_out(x)
-        output = self.linear_1(output)
-        output = self.elu(output)
-
-        return output
-
 class Model(torch.nn.Module):
 
     def __init__(self, *args, **kwargs) -> None:
@@ -222,7 +102,7 @@ class Model(torch.nn.Module):
         self.model.cls.predictions.decoder.requires_grad_(True)
 
     def forward(self,input_ids: torch.Tensor):
-        input_ids = input_ids.to("cuda").long()
+        input_ids = input_ids.to("cpu").long()
         output = self.model(input_ids).logits
         output = self.mfp(output)
         return output

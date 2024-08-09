@@ -12,8 +12,9 @@ tqdm
 unidecode
 pandarallel
 numba
-sklearn
+scikit-learn
 sentencepiece
 accelerate
 bitsandbytes
 stanza
+uvicorn

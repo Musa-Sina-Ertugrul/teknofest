@@ -219,7 +219,7 @@ class Model(torch.nn.Module):
         self.model.lm_head.decoder.requires_grad_(True)
 
     def forward(self,input_ids: torch.Tensor):
-        input_ids = input_ids.to("cuda").long()
+        input_ids = input_ids.to("cpu").long()
         output = self.model(input_ids).logits
         output = self.mfp(output)
         return output
